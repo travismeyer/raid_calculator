@@ -38,18 +38,6 @@ Keep this structure intact — `index.html` references the icons at `assets/imag
 
 ---
 
-## Hosting on GitHub Pages
-
-1. Push `index.html` and the `assets/` folder to the root of your repository (or to a `docs/` folder if you prefer that convention — just update the icon paths in `index.html` if you move it).
-2. In the repo, go to **Settings → Pages**.
-3. Under **Build and deployment**, set **Source** to `Deploy from a branch`.
-4. Choose the branch (usually `main`) and the folder (`/root` or `/docs`, matching where you placed the files).
-5. Save. GitHub will publish the site at `https://<your-username>.github.io/<repo-name>/` within a minute or two.
-
-No further configuration is needed — there's nothing to build.
-
----
-
 ## Running Locally
 
 Just open `index.html` directly in a browser, or serve the folder with any static file server, e.g.:
