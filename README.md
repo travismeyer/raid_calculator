@@ -78,4 +78,4 @@ Filesystem overhead percentages are industry-typical approximations and will var
 
 ## License
 
-No license has been applied yet. Add a `LICENSE` file to the repo root if you want to specify usage terms (MIT is a common choice for a project like this).
+See License File
