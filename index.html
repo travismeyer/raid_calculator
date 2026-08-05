@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Array Capacity Calculator — RAID &amp; ZFS</title>
+<meta name="description" content="A self-contained RAID and ZFS array capacity calculator. Compute usable storage, overhead, and fault tolerance for any array layout.">
+<link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/images/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/images/favicon-16.png">
+<link rel="icon" href="assets/images/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon-180.png">
+<meta name="theme-color" content="#0a0e14">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-void:#05070a;
+    --bg-panel:#0d1117;
+    --bg-panel-raised:#131a24;
+    --bg-inset:#0a0f16;
+    --border-subtle:#1c2531;
+    --border-strong:#2a3644;
+    --text-primary:#e6edf3;
+    --text-secondary:#a9b4c0;
+    --text-muted:#6b7684;
+    --accent-cyan:#22d3ee;
+    --accent-cyan-dim:#0e7490;
+    --accent-blue:#3b82f6;
+    --accent-purple:#a78bfa;
+    --accent-green:#34d399;
+    --accent-red:#fb7185;
+    --accent-amber:#f59e0b;
+    --accent-orange:#fb923c;
+    --accent-orange-dark:#c2560f;
+    --font-display:'Space Grotesk', 'Inter', sans-serif;
+    --font-body:'Inter', sans-serif;
+    --font-mono:'JetBrains Mono', monospace;
+    --radius-lg:16px;
+    --radius-md:10px;
+    --radius-sm:6px;
+  }
+
+  *{ box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  body{
+    margin:0;
+    background:var(--bg-void);
+    color:var(--text-primary);
+    font-family:var(--font-body);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  a{ color:var(--accent-cyan); }
+
+  ::selection{ background:var(--accent-cyan); color:#04121a; }
+
+  :focus-visible{
+    outline:2px solid var(--accent-cyan);
+    outline-offset:2px;
+  }
+
+  /* ---------- Ambient background canvas ---------- */
+  #bg-canvas{
+    position:fixed;
+    inset:0;
+    width:100%;
+    height:100%;
+    z-index:0;
+    opacity:0.95;
+    pointer-events:none;
+  }
+
+  .bg-gradient{
+    position:fixed;
+    inset:0;
+    z-index:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(59,130,246,0.28), transparent 62%),
+      radial-gradient(ellipse 800px 500px at 110% 10%, rgba(167,139,250,0.26), transparent 62%),
+      radial-gradient(ellipse 700px 600px at 50% 120%, rgba(34,211,238,0.20), transparent 62%);
+    pointer-events:none;
+  }
+
+  /* ---------- Layout shell ---------- */
+  .wrap{
+    position:relative;
+    z-index:1;
+    max-width:1280px;
+    margin:0 auto;
+    padding:0 24px 80px;
+  }
+
+  header.hero{
+    position:relative;
+    z-index:1;
+    padding:72px 24px 56px;
+    text-align:center;
+    border-bottom:1px solid var(--border-subtle);
+    margin-bottom:48px;
+  }
+
+  .eyebrow{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-family:var(--font-mono);
+    font-size:12px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--accent-cyan);
+    background:rgba(34,211,238,0.08);
+    border:1px solid rgba(34,211,238,0.25);
+    padding:6px 14px;
+    border-radius:999px;
+    margin-bottom:22px;
+  }
+  .eyebrow .dot{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--accent-green);
+    box-shadow:0 0 8px var(--accent-green);
+    animation:blink 2.2s ease-in-out infinite;
+  }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+
+  h1.title{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:clamp(2.1rem, 5vw, 3.6rem);
+    margin:0 0 16px;
+    letter-spacing:-0.01em;
+    background:linear-gradient(120deg, #f2f6fa 0%, var(--accent-cyan) 55%, var(--accent-purple) 100%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+  }
+
+  .subtitle{
+    max-width:640px;
+    margin:0 auto;
+    color:var(--text-secondary);
+    font-size:1.05rem;
+  }
+
+  /* ---------- Main layout ---------- */
+  main.layout{
+    display:grid;
+    grid-template-columns:minmax(0,440px) minmax(0,1fr);
+    gap:28px;
+    align-items:start;
+  }
+
+  @media (max-width: 940px){
+    main.layout{ grid-template-columns:1fr; }
+  }
+
+  .panel{
+    background:var(--bg-panel);
+    border:1px solid var(--border-subtle);
+    border-radius:var(--radius-lg);
+    padding:26px;
+  }
+
+  .panel + .panel{ margin-top:24px; }
+
+  .panel-title{
+    font-family:var(--font-display);
+    font-size:1.05rem;
+    font-weight:600;
+    margin:0 0 4px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .panel-title .idx{
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--accent-cyan);
+    border:1px solid var(--border-strong);
+    background:var(--bg-inset);
+    padding:2px 7px;
+    border-radius:5px;
+  }
+  .panel-sub{
+    color:var(--text-muted);
+    font-size:13px;
+    margin:0 0 20px;
+  }
+
+  .panel-header-row{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:14px;
+  }
+  .reset-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    flex-shrink:0;
+    background:var(--bg-inset);
+    border:1px solid rgba(34,211,238,0.45);
+    color:var(--text-secondary);
+    font-family:var(--font-body);
+    font-weight:600;
+    font-size:12.5px;
+    padding:8px 13px;
+    border-radius:999px;
+    cursor:pointer;
+    transition:border-color .2s ease, color .2s ease, background .2s ease, box-shadow .2s ease;
+    white-space:nowrap;
+    animation:resetIdleGlow 2.6s ease-in-out infinite;
+  }
+  @keyframes resetIdleGlow{
+    0%,100%{ box-shadow:0 0 8px rgba(34,211,238,0.18); }
+    50%{ box-shadow:0 0 16px rgba(34,211,238,0.4); }
+  }
+  .reset-btn svg{ width:14px; height:14px; transition:transform .3s ease; }
+  .reset-btn:hover, .reset-btn:focus-visible{
+    animation-play-state:paused;
+    border-color:var(--accent-red);
+    color:var(--accent-red);
+    background:rgba(251,113,133,0.08);
+    box-shadow:0 0 0 4px rgba(251,113,133,0.14), 0 0 18px rgba(251,113,133,0.45);
+  }
+  .reset-btn:hover svg{ transform:rotate(-70deg); }
+  .reset-btn:active svg{ transform:rotate(-360deg); }
+
+  @media (prefers-reduced-motion: reduce){
+    .reset-btn{ animation:none; box-shadow:0 0 10px rgba(34,211,238,0.25); }
+  }
+
+  hr.divider{
+    border:none;
+    border-top:1px solid var(--border-subtle);
+    margin:22px 0;
+  }
+
+  /* ---------- Form controls ---------- */
+  .field{ margin-bottom:18px; }
+  .field label.field-label{
+    display:block;
+    font-size:12.5px;
+    font-weight:600;
+    letter-spacing:0.03em;
+    text-transform:uppercase;
+    color:var(--text-muted);
+    margin-bottom:8px;
+  }
+
+  .row{ display:flex; gap:10px; align-items:flex-start; }
+  .row > *{ flex:1; min-width:0; }
+  .row .field-label{
+    min-height:32px;
+    display:flex;
+    align-items:flex-end;
+    line-height:1.3;
+  }
+
+  input[type="number"], select{
+    width:100%;
+    background:var(--bg-inset);
+    border:1px solid var(--border-strong);
+    color:var(--text-primary);
+    font-family:var(--font-mono);
+    font-size:15px;
+    padding:11px 12px;
+    border-radius:var(--radius-sm);
+    transition:border-color .15s ease, box-shadow .15s ease;
+    appearance:none;
+    -webkit-appearance:none;
+  }
+  select{
+    font-family:var(--font-body);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7684' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:right 10px center;
+    background-size:16px;
+    padding-right:34px;
+  }
+  input[type="number"]:focus, select:focus{
+    border-color:var(--accent-cyan);
+    box-shadow:0 0 0 3px rgba(34,211,238,0.14);
+    outline:none;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button{
+    opacity:1;
+  }
+
+  .field-hint{
+    font-size:12px;
+    color:var(--text-muted);
+    margin-top:7px;
+  }
+  .field-hint.warn{ color:var(--accent-red); }
+
+  #raidLevel{
+    font-family:var(--font-body);
+    font-weight:600;
+    font-size:15px;
+    padding:13px 34px 13px 14px;
+  }
+  #raidLevel optgroup{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    color:var(--text-muted);
+    font-style:normal;
+    background:var(--bg-panel);
+  }
+  #raidLevel option{
+    font-family:var(--font-body);
+    font-weight:500;
+    color:var(--text-primary);
+    background:var(--bg-inset);
+    padding:8px;
+  }
+
+  .level-desc{
+    margin-top:16px;
+    padding:14px 16px;
+    background:var(--bg-inset);
+    border:1px solid var(--border-subtle);
+    border-radius:var(--radius-md);
+    font-size:13px;
+    color:var(--text-secondary);
+  }
+  .level-desc strong{ color:var(--text-primary); }
+
+  /* ---------- Results panel ---------- */
+  .results-panel{ position:sticky; top:20px; }
+
+  .headline-result{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    padding:22px 4px 26px;
+    border-bottom:1px solid var(--border-subtle);
+    margin-bottom:20px;
+  }
+  .headline-result .label{
+    font-size:12.5px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:var(--text-muted);
+    font-weight:600;
+  }
+  .headline-result .value{
+    font-family:var(--font-mono);
+    font-weight:700;
+    font-size:clamp(2rem, 4vw, 2.9rem);
+    color:var(--accent-green);
+    line-height:1.1;
+  }
+  .headline-result .value small{
+    font-size:0.4em;
+    color:var(--text-muted);
+    font-weight:500;
+    margin-left:6px;
+  }
+
+  .stat-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+    margin-bottom:20px;
+  }
+  .stat-card{
+    background:var(--bg-inset);
+    border:1px solid var(--border-subtle);
+    border-radius:var(--radius-md);
+    padding:14px 15px;
+  }
+  .stat-card .stat-label{
+    font-size:11.5px;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    color:var(--text-muted);
+    margin-bottom:6px;
+    font-weight:600;
+  }
+  .stat-card .stat-value{
+    font-family:var(--font-mono);
+    font-size:1.15rem;
+    font-weight:600;
+    color:var(--text-primary);
+  }
+  .stat-card.accent-cyan .stat-value{ color:var(--accent-cyan); }
+  .stat-card.accent-purple .stat-value{ color:var(--accent-purple); }
+  .stat-card.accent-red .stat-value{ color:var(--accent-red); }
+
+  .efficiency-bar-track{
+    height:10px;
+    border-radius:999px;
+    background:var(--bg-inset);
+    border:1px solid var(--border-subtle);
+    overflow:hidden;
+    margin:8px 0 4px;
+  }
+  .efficiency-bar-fill{
+    height:100%;
+    border-radius:999px;
+    background:linear-gradient(90deg, var(--accent-purple), var(--accent-cyan), var(--accent-green));
+    transition:width .4s ease;
+  }
+
+  .fault-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-size:13px;
+    color:var(--text-secondary);
+    background:var(--bg-inset);
+    border:1px solid var(--border-subtle);
+    border-radius:var(--radius-md);
+    padding:12px 14px;
+    margin-bottom:20px;
+  }
+  .fault-badge svg{ flex-shrink:0; width:18px; height:18px; }
+  .fault-badge.level-none{ border-color:rgba(251,113,133,0.4); color:var(--accent-red); }
+  .fault-badge.level-medium{ border-color:rgba(250,204,21,0.4); color:#facc15; }
+  .fault-badge.level-high{ border-color:rgba(52,211,153,0.4); color:var(--accent-green); }
+
+  .error-banner{
+    display:none;
+    background:rgba(251,113,133,0.08);
+    border:1px solid rgba(251,113,133,0.35);
+    color:var(--accent-red);
+    border-radius:var(--radius-md);
+    padding:14px 16px;
+    font-size:13.5px;
+    margin-bottom:20px;
+  }
+  .error-banner.show{ display:block; }
+
+  /* ---------- Array visualizer ---------- */
+  .viz-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:14px;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .legend{ display:flex; gap:14px; flex-wrap:wrap; }
+  .legend-item{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:12px;
+    color:var(--text-muted);
+    font-family:var(--font-mono);
+  }
+  .legend-swatch{ width:11px; height:11px; border-radius:3px; }
+
+  .vdev-group{
+    border:1px solid var(--border-subtle);
+    border-radius:var(--radius-md);
+    padding:14px;
+    margin-bottom:12px;
+    background:var(--bg-inset);
+  }
+  .vdev-group .vdev-label{
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--text-muted);
+    margin-bottom:10px;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+  }
+  .disk-row{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    margin-bottom:6px;
+  }
+  .disk-cell{
+    width:26px;
+    height:26px;
+    border-radius:6px;
+    background:var(--border-strong);
+    position:relative;
+    transition:background .3s ease;
+    flex-shrink:0;
+  }
+  .disk-cell.data{ background:var(--accent-cyan); }
+  .disk-cell.parity{
+    background:repeating-linear-gradient(45deg, var(--accent-orange), var(--accent-orange) 4px, var(--accent-orange-dark) 4px, var(--accent-orange-dark) 8px);
+  }
+  .disk-cell.mirror{
+    background:repeating-linear-gradient(45deg, var(--accent-orange), var(--accent-orange) 4px, var(--accent-orange-dark) 4px, var(--accent-orange-dark) 8px);
+    animation:pulseSync 2.4s ease-in-out infinite;
+  }
+  .disk-cell.spare{ background:var(--border-strong); }
+  .disk-cell.spare-hot{
+    background:transparent;
+    border:2px dashed var(--text-secondary);
+  }
+  .vdev-group.spare-group{
+    border-style:dashed;
+    border-color:rgba(245,158,11,0.4);
+    background:rgba(245,158,11,0.04);
+  }
+
+  @keyframes pulseSync{
+    0%,100%{ opacity:1; }
+    50%{ opacity:0.45; }
+  }
+
+  .more-note{
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    color:var(--text-muted);
+    margin-top:4px;
+  }
+
+  .viz-caption{
+    font-size:12px;
+    color:var(--text-muted);
+    margin-top:10px;
+    line-height:1.6;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .disk-cell.mirror{ animation:none; }
+    .eyebrow .dot{ animation:none; }
+    html{ scroll-behavior:auto; }
+  }
+
+  /* ---------- Footer ---------- */
+  footer{
+    max-width:1280px;
+    margin:56px auto 0;
+    padding:24px 24px 0;
+    border-top:1px solid var(--border-subtle);
+    color:var(--text-muted);
+    font-size:12.5px;
+    text-align:center;
+    position:relative;
+    z-index:1;
+  }
+  footer p{ margin:6px 0; }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas" aria-hidden="true"></canvas>
+<div class="bg-gradient" aria-hidden="true"></div>
+
+<header class="hero">
+  <span class="eyebrow"><span class="dot"></span> RAID &amp; ZFS Array Planner</span>
+  <h1 class="title">Array Capacity Calculator</h1>
+  <p class="subtitle">Model any RAID or ZFS layout, see real usable capacity after redundancy and filesystem overhead, and visualize exactly where your parity lives.</p>
+</header>
+
+<div class="wrap">
+<main class="layout">
+
+  <!-- ============ CONFIG PANEL ============ -->
+  <section class="panel" aria-labelledby="config-title">
+    <div class="panel-header-row">
+      <div>
+        <h2 class="panel-title" id="config-title"><span class="idx">01</span> Configure Array</h2>
+        <p class="panel-sub">Enter your drives, then choose a layout.</p>
+      </div>
+      <button type="button" id="resetBtn" class="reset-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+        Reset
+      </button>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label class="field-label" for="driveCount">Number of Drives</label>
+        <input type="number" id="driveCount" min="1" max="200" step="1" placeholder="e.g. 8">
+      </div>
+      <div class="field">
+        <label class="field-label" for="driveCapacity">Capacity per Drive</label>
+        <input type="number" id="driveCapacity" min="0.01" step="any" placeholder="e.g. 4">
+      </div>
+      <div class="field" style="max-width:100px;">
+        <label class="field-label" for="capacityUnit">Unit</label>
+        <select id="capacityUnit">
+          <option value="TB" selected>TB</option>
+          <option value="GB">GB</option>
+        </select>
+      </div>
+    </div>
+    <p class="field-hint">Only count drives that are actually part of the array here. Standby drives go in Hot Spares below.</p>
+
+    <div class="field">
+      <label class="field-label" for="hotSpareCount">Hot Spare Drives <span style="text-transform:none; font-weight:400; color:var(--text-muted);">(optional)</span></label>
+      <input type="number" id="hotSpareCount" min="0" max="50" step="1" placeholder="0">
+      <p class="field-hint">Hot spares sit outside the array on standby and add zero usable capacity — they just swap in automatically after a drive fails.</p>
+      <p class="field-hint" style="margin-top:8px;"><strong style="color:var(--text-secondary);">Example:</strong> a 3-drive RAID 1 with one spare = <strong style="color:var(--text-secondary);">2</strong> in "Number of Drives" above, <strong style="color:var(--text-secondary);">1</strong> here.</p>
+    </div>
+
+    <hr class="divider">
+
+    <div class="field">
+      <label class="field-label" for="raidLevel">Array Layout</label>
+      <select id="raidLevel"></select>
+    </div>
+
+    <div id="groupField" class="field" style="display:none;">
+      <label class="field-label" for="groupCount">Number of VDEVs / Groups</label>
+      <input type="number" id="groupCount" min="1" max="50" step="1" value="2">
+      <p class="field-hint">Drives are split evenly across this many groups and striped together.</p>
+    </div>
+
+    <div class="level-desc" id="levelDesc"></div>
+
+    <hr class="divider">
+
+    <div class="field">
+      <label class="field-label" for="filesystem">Format / Filesystem</label>
+      <select id="filesystem">
+        <option value="raw">Raw / Unformatted (no overhead)</option>
+        <option value="ntfs" selected>NTFS</option>
+        <option value="refs">ReFS</option>
+        <option value="exfat">exFAT</option>
+        <option value="fat32">FAT32</option>
+        <option value="ext4">ext4</option>
+        <option value="xfs">XFS</option>
+        <option value="zfsnative">ZFS native pool</option>
+        <option value="apfs">APFS</option>
+      </select>
+      <p class="field-hint" id="fsHint"></p>
+    </div>
+
+    <div class="field" style="margin-bottom:0;">
+      <label class="field-label" for="unitDisplay">Display Units</label>
+      <select id="unitDisplay">
+        <option value="decimal" selected>Decimal — TB/GB (as advertised)</option>
+        <option value="binary">Binary — TiB/GiB (as most OSes report)</option>
+      </select>
+      <p class="field-hint">Drive vendors use decimal (1 TB = 10¹² bytes); Windows/most OSes report binary (1 TiB = 2⁴⁰ bytes). Same data, different units — switch to see the number your OS would show.</p>
+    </div>
+  </section>
+
+  <!-- ============ RESULTS PANEL ============ -->
+  <div class="results-panel">
+    <section class="panel" aria-labelledby="results-title">
+      <h2 class="panel-title" id="results-title"><span class="idx">02</span> Usable Capacity</h2>
+      <p class="panel-sub">Live results based on your configuration.</p>
+
+      <div class="error-banner" id="errorBanner"></div>
+
+      <div id="resultsBody">
+        <div class="headline-result">
+          <span class="label">Usable Capacity (after redundancy &amp; filesystem overhead)</span>
+          <span class="value" id="usableFinal">—</span>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-label">Raw Total Capacity</div>
+            <div class="stat-value" id="rawTotal">—</div>
+          </div>
+          <div class="stat-card accent-cyan">
+            <div class="stat-label">Usable After RAID</div>
+            <div class="stat-value" id="usableRaid">—</div>
+          </div>
+          <div class="stat-card accent-purple">
+            <div class="stat-label">Redundancy Overhead</div>
+            <div class="stat-value" id="raidOverhead">—</div>
+          </div>
+          <div class="stat-card accent-red">
+            <div class="stat-label">Filesystem Overhead</div>
+            <div class="stat-value" id="fsOverheadStat">—</div>
+          </div>
+          <div class="stat-card" style="grid-column:1/-1;">
+            <div class="stat-label">Total Physical Drives (Array + Spares)</div>
+            <div class="stat-value" id="totalDrives">—</div>
+          </div>
+        </div>
+
+        <div class="field-label" style="margin-bottom:6px;">Storage Efficiency</div>
+        <div class="efficiency-bar-track"><div class="efficiency-bar-fill" id="efficiencyBar" style="width:0%;"></div></div>
+        <p class="field-hint" id="efficiencyLabel" style="margin-bottom:18px;">—</p>
+
+        <div class="fault-badge" id="faultBadge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.4 8.7-8 10-4.6-1.3-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
+          <span id="faultText">—</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="viz-title">
+      <div class="viz-header">
+        <h2 class="panel-title" id="viz-title" style="margin-bottom:0;"><span class="idx">03</span> Array Visualizer</h2>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-swatch" style="background:var(--accent-cyan);"></span>Data</span>
+          <span class="legend-item"><span class="legend-swatch" style="background:repeating-linear-gradient(45deg, var(--accent-orange), var(--accent-orange) 3px, var(--accent-orange-dark) 3px, var(--accent-orange-dark) 6px);"></span>Parity / Mirror</span>
+          <span class="legend-item"><span class="legend-swatch" style="background:transparent; border:2px dashed var(--text-secondary);"></span>Hot Spare</span>
+        </div>
+      </div>
+      <div id="vizBody"></div>
+      <p class="viz-caption" id="vizCaption"></p>
+    </section>
+  </div>
+
+</main>
+</div>
+
+<footer>
+  <p>Figures are calculated directly from your inputs using standard RAID/ZFS capacity formulas. Filesystem overhead percentages are industry-typical approximations and vary by configuration, allocation size, and reserved-block settings.</p>
+  <p>Runs entirely in your browser — nothing here is uploaded or stored.</p>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================================================
+     RAID / ZFS level definitions
+     usableFactor(n, g) returns usable capacity in "drive units"
+     g = number of groups/vdevs (ignored when level.grouping is false)
+  ============================================================ */
+  const RAID_LEVELS = {
+    jbod: {
+      name:"JBOD", family:"standard", min:1,
+      meta:(n)=>`min 1 · no redundancy`,
+      usableFactor:(n)=>n,
+      parityDrives:0,
+      desc:"Concatenates (spans) all drives into a single volume. No striping, no redundancy — losing any drive can affect the data stored on it.",
+      fault:(n)=>({text:"No fault tolerance — any drive failure can cause data loss.", level:"none"})
+    },
+    raid0: {
+      name:"RAID 0", family:"standard", min:2,
+      meta:(n)=>`min 2 · striping`,
+      usableFactor:(n)=>n,
+      parityDrives:0,
+      desc:"Stripes data evenly across all drives for maximum performance and capacity. Zero redundancy — one drive failure loses the entire array.",
+      fault:(n)=>({text:"No fault tolerance — any single drive failure loses the array.", level:"none"})
+    },
+    raid1: {
+      name:"RAID 1", family:"standard", min:2,
+      meta:(n)=>`min 2 · mirroring`,
+      usableFactor:(n)=>1,
+      mirrorAll:true,
+      desc:"Mirrors identical data across every drive in the array. Usable capacity equals a single drive, regardless of how many drives you add.",
+      fault:(n)=>({text:`Survives up to ${n-1} of ${n} drive failures — at least one full copy must remain.`, level:"high"})
+    },
+    raid5: {
+      name:"RAID 5", family:"standard", min:3,
+      meta:(n)=>`min 3 · single parity`,
+      usableFactor:(n)=>n-1,
+      parityDrives:1,
+      desc:"Stripes data with single distributed parity. Survives exactly one drive failure per array.",
+      fault:(n)=>({text:"Survives 1 drive failure.", level:"medium"})
+    },
+    raid6: {
+      name:"RAID 6", family:"standard", min:4,
+      meta:(n)=>`min 4 · dual parity`,
+      usableFactor:(n)=>n-2,
+      parityDrives:2,
+      desc:"Stripes data with double distributed parity. Survives any two simultaneous drive failures per array.",
+      fault:(n)=>({text:"Survives 2 simultaneous drive failures.", level:"high"})
+    },
+    raid10: {
+      name:"RAID 10", family:"standard", min:4, even:true,
+      meta:(n)=>`min 4, even · mirror + stripe`,
+      usableFactor:(n)=>n/2,
+      mirrorPairs:true, pairSize:2,
+      desc:"A striped set of mirrored pairs. Combines RAID 1's redundancy with RAID 0's performance.",
+      fault:(n)=>({text:`Survives 1 failure per mirror pair (up to ${n/2} total) — but fails if both drives in the same pair die.`, level:"high"})
+    },
+    raid50: {
+      name:"RAID 50", family:"standard", min:6, grouping:true, groupMin:3,
+      meta:(n)=>`min 3/group · striped RAID 5`,
+      usableFactor:(n,g)=>{ const d=n/g; return g*(d-1); },
+      parityDrives:1,
+      desc:"Multiple RAID 5 groups striped together. Each group independently survives one drive failure.",
+      fault:(n,g)=>({text:`Survives 1 drive failure per group (${g} groups) — fails if any single group loses 2 drives.`, level:"medium"})
+    },
+    raid60: {
+      name:"RAID 60", family:"standard", min:8, grouping:true, groupMin:4,
+      meta:(n)=>`min 4/group · striped RAID 6`,
+      usableFactor:(n,g)=>{ const d=n/g; return g*(d-2); },
+      parityDrives:2,
+      desc:"Multiple RAID 6 groups striped together. Each group independently survives two drive failures.",
+      fault:(n,g)=>({text:`Survives 2 drive failures per group (${g} groups).`, level:"high"})
+    },
+    zstripe: {
+      name:"ZFS Stripe", family:"zfs", min:1,
+      meta:(n)=>`min 1 · single vdev`,
+      usableFactor:(n)=>n,
+      parityDrives:0,
+      desc:"A single striped vdev with no redundancy — the ZFS equivalent of RAID 0. Losing any drive loses the pool.",
+      fault:(n)=>({text:"No fault tolerance — any drive failure can lose the pool.", level:"none"})
+    },
+    zmirror: {
+      name:"ZFS Mirror", family:"zfs", min:2,
+      meta:(n)=>`min 2 · single vdev`,
+      usableFactor:(n)=>1,
+      mirrorAll:true,
+      desc:"A single mirror vdev containing all drives. Usable capacity equals one drive's capacity.",
+      fault:(n)=>({text:`Survives up to ${n-1} of ${n} drive failures — at least one copy must remain.`, level:"high"})
+    },
+    zstripedmirror: {
+      name:"Striped Mirrors", family:"zfs", min:4, grouping:true, groupMin:2,
+      meta:(n)=>`min 2/vdev · RAID10-equivalent`,
+      usableFactor:(n,g)=>g,
+      mirrorPairs:true,
+      desc:"Multiple mirror vdevs striped together into one pool — ZFS's equivalent of RAID 10. The most common high-performance ZFS layout.",
+      fault:(n,g)=>({text:`Survives 1 failure per mirror vdev (${g} vdevs) — fails if an entire vdev loses all its drives.`, level:"high"})
+    },
+    raidz1: {
+      name:"RAIDZ1", family:"zfs", min:3, grouping:true, groupMin:3,
+      meta:(n)=>`min 3/vdev · single parity`,
+      usableFactor:(n,g)=>{ const d=n/g; return g*(d-1); },
+      parityDrives:1,
+      desc:"ZFS's single-parity layout, equivalent to RAID 5. Each vdev survives one drive failure.",
+      fault:(n,g)=>({text:`Survives 1 drive failure per vdev (${g} vdevs).`, level:"medium"})
+    },
+    raidz2: {
+      name:"RAIDZ2", family:"zfs", min:4, grouping:true, groupMin:4,
+      meta:(n)=>`min 4/vdev · dual parity`,
+      usableFactor:(n,g)=>{ const d=n/g; return g*(d-2); },
+      parityDrives:2,
+      desc:"ZFS's double-parity layout, equivalent to RAID 6. Each vdev survives two drive failures. The most common ZFS choice for large pools.",
+      fault:(n,g)=>({text:`Survives 2 drive failures per vdev (${g} vdevs).`, level:"high"})
+    },
+    raidz3: {
+      name:"RAIDZ3", family:"zfs", min:5, grouping:true, groupMin:5,
+      meta:(n)=>`min 5/vdev · triple parity`,
+      usableFactor:(n,g)=>{ const d=n/g; return g*(d-3); },
+      parityDrives:3,
+      desc:"ZFS's triple-parity layout. Each vdev survives three simultaneous drive failures — built for very large, high-risk arrays during long rebuilds.",
+      fault:(n,g)=>({text:`Survives 3 drive failures per vdev (${g} vdevs).`, level:"high"})
+    }
+  };
+
+  const FILESYSTEMS = {
+    raw:      { name:"Raw / Unformatted", overhead:0,     note:"No filesystem is applied — full block capacity is usable." },
+    ntfs:     { name:"NTFS",              overhead:0.015, note:"≈1.5% for the Master File Table and metadata reservation." },
+    refs:     { name:"ReFS",              overhead:0.01,  note:"≈1% for metadata and integrity structures." },
+    exfat:    { name:"exFAT",             overhead:0.001, note:"≈0.1% — minimal metadata overhead." },
+    fat32:    { name:"FAT32",             overhead:0.005, note:"≈0.5% for file allocation tables." },
+    ext4:     { name:"ext4",              overhead:0.05,  note:"≈5% default reserved-blocks allocation (tunable with tune2fs)." },
+    xfs:      { name:"XFS",               overhead:0.005, note:"≈0.5% for metadata structures." },
+    zfsnative:{ name:"ZFS native pool",   overhead:0.032, note:"≈3.2% default slop-space reservation." },
+    apfs:     { name:"APFS",              overhead:0.01,  note:"≈1% for metadata structures." }
+  };
+
+  /* ============================================================
+     State
+  ============================================================ */
+  const state = {
+    family: "standard",
+    levelKey: "raid5"
+  };
+
+  const el = (id)=>document.getElementById(id);
+  const driveCountEl = el("driveCount");
+  const driveCapacityEl = el("driveCapacity");
+  const capacityUnitEl = el("capacityUnit");
+  const hotSpareCountEl = el("hotSpareCount");
+  const groupFieldEl = el("groupField");
+  const groupCountEl = el("groupCount");
+  const filesystemEl = el("filesystem");
+  const unitDisplayEl = el("unitDisplay");
+  const raidSelectEl = el("raidLevel");
+  const levelDescEl = el("levelDesc");
+  const fsHintEl = el("fsHint");
+  const errorBannerEl = el("errorBanner");
+  const resultsBodyEl = el("resultsBody");
+  const resetBtnEl = el("resetBtn");
+
+  /* ============================================================
+     Formatting helpers
+  ============================================================ */
+  function formatBytes(bytes, binary){
+    if(!isFinite(bytes) || bytes<=0){
+      return binary ? "0 GiB" : "0 GB";
+    }
+    const base = binary ? 1024 : 1000;
+    const units = binary
+      ? ["B","KiB","MiB","GiB","TiB","PiB"]
+      : ["B","KB","MB","GB","TB","PB"];
+    let i = 0;
+    let val = bytes;
+    while(val >= base && i < units.length - 1){
+      val /= base;
+      i++;
+    }
+    const decimals = val >= 100 ? 1 : (val >= 10 ? 2 : 3);
+    return `${val.toFixed(decimals)} ${units[i]}`;
+  }
+
+  function capacityBytesPerDrive(){
+    const val = parseFloat(driveCapacityEl.value) || 0;
+    const unit = capacityUnitEl.value;
+    return val * (unit === "TB" ? 1e12 : 1e9);
+  }
+
+  /* ============================================================
+     Rendering: RAID level dropdown
+  ============================================================ */
+  function populateRaidSelect(){
+    const n = parseInt(driveCountEl.value, 10) || 0;
+    const groupsMeta = { standard: "Standard RAID", zfs: "ZFS" };
+
+    raidSelectEl.innerHTML = "";
+    ["standard","zfs"].forEach(fam => {
+      const optgroup = document.createElement("optgroup");
+      optgroup.label = groupsMeta[fam];
+      Object.keys(RAID_LEVELS).filter(k => RAID_LEVELS[k].family === fam).forEach(key => {
+        const level = RAID_LEVELS[key];
+        const option = document.createElement("option");
+        option.value = key;
+        option.textContent = `${level.name} — ${level.meta(n)}`;
+        if(key === state.levelKey) option.selected = true;
+        optgroup.appendChild(option);
+      });
+      raidSelectEl.appendChild(optgroup);
+    });
+  }
+
+  function updateLevelUI(){
+    const level = RAID_LEVELS[state.levelKey];
+    groupFieldEl.style.display = level.grouping ? "block" : "none";
+    if(level.grouping && !groupCountEl.dataset.touched){
+      const defaults = { raid50:2, raid60:2, zstripedmirror:2, raidz1:1, raidz2:1, raidz3:1 };
+      groupCountEl.value = defaults[state.levelKey] || 1;
+    }
+    levelDescEl.innerHTML = `<strong>${level.name}</strong> — ${level.desc}`;
+  }
+
+  /* ============================================================
+     Validation
+  ============================================================ */
+  function validate(n, level, g){
+    if(!n || n < 1){
+      return "Enter at least 1 drive.";
+    }
+    if(n < level.min){
+      return `${level.name} requires at least ${level.min} drives.`;
+    }
+    if(level.even && n % 2 !== 0){
+      return `${level.name} requires an even number of drives.`;
+    }
+    if(level.mirrorPairs && level.pairSize && n % level.pairSize !== 0){
+      return `${level.name} requires drives in pairs of ${level.pairSize}.`;
+    }
+    if(level.grouping){
+      if(!g || g < 1){
+        return "Enter at least 1 group.";
+      }
+      if(n % g !== 0){
+        return `${n} drives can't be split evenly across ${g} groups.`;
+      }
+      const perGroup = n / g;
+      if(perGroup < level.groupMin){
+        return `Each group needs at least ${level.groupMin} drives for ${level.name} (currently ${perGroup}).`;
+      }
+    }
+    return null;
+  }
+
+  /* ============================================================
+     Core calculation
+  ============================================================ */
+  function recalc(){
+    const level = RAID_LEVELS[state.levelKey];
+    const n = parseInt(driveCountEl.value, 10) || 0;
+    const g = level.grouping ? (parseInt(groupCountEl.value, 10) || 0) : (level.mirrorPairs ? n/2 : 1);
+    const capBytes = capacityBytesPerDrive();
+    const binary = unitDisplayEl.value === "binary";
+    const fsKey = filesystemEl.value;
+    const fs = FILESYSTEMS[fsKey];
+
+    fsHintEl.textContent = fs.note;
+
+    const errMsg = validate(n, level, g);
+    if(errMsg || capBytes <= 0){
+      errorBannerEl.textContent = errMsg || "Enter a drive capacity greater than 0.";
+      errorBannerEl.classList.add("show");
+      resultsBodyEl.style.opacity = "0.35";
+      el("vizBody").style.opacity = "0.35";
+      return;
+    }
+    errorBannerEl.classList.remove("show");
+    resultsBodyEl.style.opacity = "1";
+    el("vizBody").style.opacity = "1";
+
+    const rawBytes = n * capBytes;
+    const usableDrives = level.usableFactor(n, g);
+    const usableRaidBytes = usableDrives * capBytes;
+    const usableFinalBytes = usableRaidBytes * (1 - fs.overhead);
+    const raidOverheadBytes = rawBytes - usableRaidBytes;
+    const fsOverheadBytes = usableRaidBytes - usableFinalBytes;
+    const efficiency = rawBytes > 0 ? (usableFinalBytes / rawBytes) * 100 : 0;
+
+    el("rawTotal").textContent = formatBytes(rawBytes, binary);
+    el("usableRaid").textContent = formatBytes(usableRaidBytes, binary);
+    el("raidOverhead").textContent = formatBytes(raidOverheadBytes, binary);
+    el("fsOverheadStat").textContent = formatBytes(fsOverheadBytes, binary);
+    el("usableFinal").innerHTML = `${formatBytes(usableFinalBytes, binary)} <small>usable</small>`;
+    el("efficiencyBar").style.width = `${Math.max(0, Math.min(100, efficiency)).toFixed(1)}%`;
+    el("efficiencyLabel").textContent = `${efficiency.toFixed(1)}% of raw capacity is usable after redundancy and filesystem overhead.`;
+
+    const faultInfo = level.fault(n, g);
+    let faultText = faultInfo.text;
+    const spares = Math.max(0, parseInt(hotSpareCountEl.value, 10) || 0);
+    if(spares > 0 && faultInfo.level !== "none"){
+      faultText += ` Plus ${spares} hot spare${spares > 1 ? "s" : ""} on standby to auto-rebuild after a failure.`;
+    } else if(spares > 0){
+      faultText += ` ${spares} hot spare${spares > 1 ? "s" : ""} standing by, but this layout still can't survive a failure on its own.`;
+    }
+    el("faultText").textContent = faultText;
+    const badge = el("faultBadge");
+    badge.classList.remove("level-none","level-medium","level-high");
+    badge.classList.add(`level-${faultInfo.level}`);
+
+    const totalPhysicalDrives = n + spares;
+    const totalPhysicalBytes = totalPhysicalDrives * capBytes;
+    el("totalDrives").textContent = `${totalPhysicalDrives} drives (${n} array + ${spares} spare${spares === 1 ? "" : "s"}) — ${formatBytes(totalPhysicalBytes, binary)} purchased`;
+
+    renderVisualizer(level, n, g, spares);
+  }
+
+  /* ============================================================
+     Array visualizer
+  ============================================================ */
+  function makeCell(cls){
+    const d = document.createElement("div");
+    d.className = `disk-cell ${cls}`;
+    return d;
+  }
+
+  function renderSparesGroup(body, spares){
+    if(spares <= 0) return;
+    const group = document.createElement("div");
+    group.className = "vdev-group spare-group";
+    const label = document.createElement("div");
+    label.className = "vdev-label";
+    label.textContent = `Hot Spares — ${spares} drive${spares > 1 ? "s" : ""} on standby, not part of the array`;
+    group.appendChild(label);
+    const row = document.createElement("div");
+    row.className = "disk-row";
+    const shown = Math.min(spares, 24);
+    for(let i=0;i<shown;i++) row.appendChild(makeCell("spare-hot"));
+    group.appendChild(row);
+    if(spares > shown){
+      const more = document.createElement("div");
+      more.className = "more-note";
+      more.textContent = `+ ${spares - shown} more spares`;
+      group.appendChild(more);
+    }
+    body.appendChild(group);
+  }
+
+  function renderVisualizer(level, n, g, spares){
+    const body = el("vizBody");
+    const caption = el("vizCaption");
+    body.innerHTML = "";
+    spares = spares || 0;
+
+    const MAX_CELLS = 240;
+
+    if(level.mirrorAll){
+      // RAID 1 / ZFS mirror: every drive mirrors every other drive
+      const group = document.createElement("div");
+      group.className = "vdev-group";
+      const label = document.createElement("div");
+      label.className = "vdev-label";
+      label.textContent = `Mirror vdev — ${n} drives, identical data`;
+      group.appendChild(label);
+      const row = document.createElement("div");
+      row.className = "disk-row";
+      const shown = Math.min(n, 32);
+      for(let i=0;i<shown;i++) row.appendChild(makeCell("mirror"));
+      group.appendChild(row);
+      if(n > shown){
+        const more = document.createElement("div");
+        more.className = "more-note";
+        more.textContent = `+ ${n - shown} more mirrored drives`;
+        group.appendChild(more);
+      }
+      body.appendChild(group);
+      renderSparesGroup(body, spares);
+      caption.textContent = "Every drive holds an identical full copy of the data — shown pulsing in sync.";
+      return;
+    }
+
+    if(level.mirrorPairs){
+      // RAID 10 / ZFS striped mirrors: g groups of pairSize (or n/g) drives
+      const pairSize = n / g;
+      const groupsToShow = Math.min(g, 12);
+      for(let gi=0; gi<groupsToShow; gi++){
+        const group = document.createElement("div");
+        group.className = "vdev-group";
+        const label = document.createElement("div");
+        label.className = "vdev-label";
+        label.textContent = `Mirror ${gi+1} of ${g} — ${pairSize} drives, striped across vdevs`;
+        group.appendChild(label);
+        const row = document.createElement("div");
+        row.className = "disk-row";
+        for(let i=0;i<pairSize;i++) row.appendChild(makeCell("mirror"));
+        group.appendChild(row);
+        body.appendChild(group);
+      }
+      if(g > groupsToShow){
+        const more = document.createElement("div");
+        more.className = "more-note";
+        more.textContent = `+ ${g - groupsToShow} more mirror vdevs, striped identically`;
+        body.appendChild(more);
+      }
+      renderSparesGroup(body, spares);
+      caption.textContent = "Each box is one mirror vdev (drives shown pulsing = identical copies). Data is then striped evenly across every vdev for performance.";
+      return;
+    }
+
+    if(level.parityDrives > 0){
+      const groups = level.grouping ? g : 1;
+      const perGroup = n / groups;
+      const groupsToShow = Math.min(groups, 6);
+      const rows = Math.min(perGroup, 6);
+
+      for(let gi=0; gi<groupsToShow; gi++){
+        const group = document.createElement("div");
+        group.className = "vdev-group";
+        const label = document.createElement("div");
+        label.className = "vdev-label";
+        label.textContent = groups > 1
+          ? `Group / vdev ${gi+1} of ${groups} — ${perGroup} drives`
+          : `${level.name} — ${perGroup} drives`;
+        group.appendChild(label);
+
+        for(let r=0; r<rows; r++){
+          const row = document.createElement("div");
+          row.className = "disk-row";
+          const parityCols = new Set();
+          for(let k=0;k<level.parityDrives;k++){
+            parityCols.add((r + k) % perGroup);
+          }
+          for(let c=0;c<perGroup;c++){
+            row.appendChild(makeCell(parityCols.has(c) ? "parity" : "data"));
+          }
+          group.appendChild(row);
+        }
+        if(perGroup > rows){
+          const more = document.createElement("div");
+          more.className = "more-note";
+          more.textContent = `Pattern repeats for remaining stripes`;
+          group.appendChild(more);
+        }
+        body.appendChild(group);
+      }
+      if(groups > groupsToShow){
+        const more = document.createElement("div");
+        more.className = "more-note";
+        more.textContent = `+ ${groups - groupsToShow} more identical groups`;
+        body.appendChild(more);
+      }
+      renderSparesGroup(body, spares);
+      caption.textContent = "Striped orange cells are parity, cyan cells are data — parity rotates across drives each stripe row so no single drive is a bottleneck. A simplified illustration; exact ordering varies by controller/implementation.";
+      return;
+    }
+
+    // Plain striping: JBOD / RAID0 / ZFS stripe
+    const group = document.createElement("div");
+    group.className = "vdev-group";
+    const label = document.createElement("div");
+    label.className = "vdev-label";
+    label.textContent = `${level.name} — ${n} drives, striped, no redundancy`;
+    group.appendChild(label);
+    const shown = Math.min(n, MAX_CELLS);
+    let row = document.createElement("div");
+    row.className = "disk-row";
+    for(let i=0;i<shown;i++){
+      if(i>0 && i % 16 === 0){
+        group.appendChild(row);
+        row = document.createElement("div");
+        row.className = "disk-row";
+      }
+      row.appendChild(makeCell("data"));
+    }
+    group.appendChild(row);
+    if(n > shown){
+      const more = document.createElement("div");
+      more.className = "more-note";
+      more.textContent = `+ ${n - shown} more striped drives`;
+      group.appendChild(more);
+    }
+    body.appendChild(group);
+    renderSparesGroup(body, spares);
+    caption.textContent = "All drives carry data with no redundancy — losing one drive affects the whole array.";
+  }
+
+  /* ============================================================
+     Event wiring
+  ============================================================ */
+  raidSelectEl.addEventListener("change", () => {
+    state.levelKey = raidSelectEl.value;
+    updateLevelUI();
+    recalc();
+  });
+
+  [driveCountEl, driveCapacityEl, capacityUnitEl, hotSpareCountEl, filesystemEl, unitDisplayEl].forEach(input => {
+    input.addEventListener("input", recalc);
+    input.addEventListener("change", recalc);
+  });
+
+  groupCountEl.addEventListener("input", () => {
+    groupCountEl.dataset.touched = "1";
+    recalc();
+  });
+
+  resetBtnEl.addEventListener("click", () => {
+    driveCountEl.value = "";
+    driveCapacityEl.value = "";
+    capacityUnitEl.value = "TB";
+    hotSpareCountEl.value = "";
+    groupCountEl.value = "2";
+    delete groupCountEl.dataset.touched;
+    filesystemEl.value = "ntfs";
+    unitDisplayEl.value = "decimal";
+    state.levelKey = "raid5";
+    populateRaidSelect();
+    updateLevelUI();
+    recalc();
+    driveCountEl.focus();
+  });
+
+  /* ============================================================
+     Init
+  ============================================================ */
+  populateRaidSelect();
+  updateLevelUI();
+  recalc();
+
+  /* ============================================================
+     Ambient background animation
+  ============================================================ */
+  const canvas = document.getElementById("bg-canvas");
+  const ctx = canvas.getContext("2d");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let particles = [];
+  let w, h;
+  const mouse = { x: null, y: null };
+  const MOUSE_RADIUS = 160;
+
+  function resize(){
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = Math.max(window.innerHeight, 700);
+  }
+
+  function initParticles(){
+    const count = Math.min(110, Math.floor((w*h)/13000));
+    particles = [];
+    const colors = ["34,211,238", "167,139,250", "59,130,246", "52,211,153"];
+    for(let i=0;i<count;i++){
+      particles.push({
+        x: Math.random()*w,
+        y: Math.random()*h,
+        size: 2.5 + Math.random()*3.5,
+        speedX: (Math.random()-0.5)*0.3,
+        speedY: (Math.random()-0.5)*0.3,
+        color: colors[Math.floor(Math.random()*colors.length)],
+        alpha: 0.35 + Math.random()*0.45
+      });
+    }
+  }
+
+  function step(){
+    ctx.clearRect(0,0,w,h);
+    for(const p of particles){
+      p.x += p.speedX;
+      p.y += p.speedY;
+
+      if(mouse.x !== null){
+        const mdx = p.x - mouse.x;
+        const mdy = p.y - mouse.y;
+        const mdist = Math.sqrt(mdx*mdx + mdy*mdy);
+        if(mdist < MOUSE_RADIUS && mdist > 0.01){
+          const push = (1 - mdist/MOUSE_RADIUS) * 1.8;
+          p.x += (mdx/mdist) * push;
+          p.y += (mdy/mdist) * push;
+        }
+      }
+
+      if(p.x < -10) p.x = w+10;
+      if(p.x > w+10) p.x = -10;
+      if(p.y < -10) p.y = h+10;
+      if(p.y > h+10) p.y = -10;
+      ctx.shadowColor = `rgba(${p.color},0.9)`;
+      ctx.shadowBlur = 6;
+      ctx.fillStyle = `rgba(${p.color},${p.alpha})`;
+      ctx.fillRect(p.x, p.y, p.size, p.size);
+      ctx.shadowBlur = 0;
+    }
+    for(let i=0;i<particles.length;i++){
+      for(let j=i+1;j<particles.length;j++){
+        const a = particles[i], b = particles[j];
+        const dx = a.x-b.x, dy = a.y-b.y;
+        const dist = Math.sqrt(dx*dx+dy*dy);
+        if(dist < 160){
+          ctx.strokeStyle = `rgba(34,211,238,${0.22*(1-dist/160)})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(a.x,a.y);
+          ctx.lineTo(b.x,b.y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    if(mouse.x !== null){
+      for(const p of particles){
+        const dx = p.x - mouse.x;
+        const dy = p.y - mouse.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist < MOUSE_RADIUS){
+          ctx.strokeStyle = `rgba(167,139,250,${0.5*(1-dist/MOUSE_RADIUS)})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(mouse.x, mouse.y);
+          ctx.lineTo(p.x, p.y);
+          ctx.stroke();
+        }
+      }
+      ctx.beginPath();
+      ctx.arc(mouse.x, mouse.y, 3, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(226,237,243,0.8)";
+      ctx.shadowColor = "rgba(34,211,238,0.9)";
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    if(!reduceMotion) requestAnimationFrame(step);
+  }
+
+  resize();
+  initParticles();
+  window.addEventListener("resize", () => { resize(); initParticles(); });
+
+  window.addEventListener("mousemove", (e) => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  });
+  window.addEventListener("mouseleave", () => { mouse.x = null; mouse.y = null; });
+  document.addEventListener("mouseout", (e) => {
+    if(!e.relatedTarget) { mouse.x = null; mouse.y = null; }
+  });
+  window.addEventListener("touchmove", (e) => {
+    if(e.touches && e.touches[0]){
+      mouse.x = e.touches[0].clientX;
+      mouse.y = e.touches[0].clientY;
+    }
+  }, { passive:true });
+  window.addEventListener("touchend", () => { mouse.x = null; mouse.y = null; });
+
+  if(!reduceMotion){
+    requestAnimationFrame(step);
+  } else {
+    step();
+  }
+
+})();
+</script>
+</body>
+</html>
