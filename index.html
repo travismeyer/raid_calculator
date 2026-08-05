@@ -1,551 +1,629 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Array Capacity Calculator — RAID &amp; ZFS</title>
-<meta name="description" content="A self-contained RAID and ZFS array capacity calculator. Compute usable storage, overhead, and fault tolerance for any array layout.">
-<link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/images/favicon-32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="assets/images/favicon-16.png">
-<link rel="icon" href="assets/images/favicon.ico" sizes="any">
-<link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon-180.png">
-<meta name="theme-color" content="#0a0e14">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --bg-void:#05070a;
-    --bg-panel:#0d1117;
-    --bg-panel-raised:#131a24;
-    --bg-inset:#0a0f16;
-    --border-subtle:#1c2531;
-    --border-strong:#2a3644;
-    --text-primary:#e6edf3;
-    --text-secondary:#a9b4c0;
-    --text-muted:#6b7684;
-    --accent-cyan:#22d3ee;
-    --accent-cyan-dim:#0e7490;
-    --accent-blue:#3b82f6;
-    --accent-purple:#a78bfa;
-    --accent-green:#34d399;
-    --accent-red:#fb7185;
-    --accent-amber:#f59e0b;
-    --accent-orange:#fb923c;
-    --accent-orange-dark:#c2560f;
-    --font-display:'Space Grotesk', 'Inter', sans-serif;
-    --font-body:'Inter', sans-serif;
-    --font-mono:'JetBrains Mono', monospace;
-    --radius-lg:16px;
-    --radius-md:10px;
-    --radius-sm:6px;
-  }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  *{ box-sizing:border-box; }
-  html{ scroll-behavior:smooth; }
-  body{
-    margin:0;
-    background:var(--bg-void);
-    color:var(--text-primary);
-    font-family:var(--font-body);
-    line-height:1.5;
-    -webkit-font-smoothing:antialiased;
-  }
+  <!-- Primary Search & Indexing Meta Tags -->
+  <title>RAID & ZFS Capacity Calculator — Usable Storage & Parity Estimator</title>
+  <meta name="description" content="Free online RAID and ZFS capacity calculator. Instantly compute usable storage space, fault tolerance, parity overhead, and TB/TiB binary conversions for RAID 0, 1, 5, 6, 10, 50, 60, and ZFS RAIDZ1, RAIDZ2, RAIDZ3.">
+  <meta name="keywords" content="RAID calculator, ZFS calculator, RAID capacity calculator, RAID 5 usable space, RAID 6 calculator, ZFS RAIDZ2 capacity, storage array calculator, TB to TiB calculator">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <link rel="canonical" href="https://raidcalculator.app/">
 
-  a{ color:var(--accent-cyan); }
+  <!-- Favicons & Icons -->
+  <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/images/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/images/favicon-16.png">
+  <link rel="icon" href="assets/images/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon-180.png">
+  <meta name="theme-color" content="#0a0e14">
 
-  ::selection{ background:var(--accent-cyan); color:#04121a; }
+  <!-- Open Graph / Social Sharing (Facebook, LinkedIn, Discord) -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://raidcalculator.app/">
+  <meta property="og:title" content="RAID & ZFS Storage Capacity Calculator">
+  <meta property="og:description" content="Calculate usable storage space, fault tolerance, and parity overhead across standard RAID and ZFS RAIDZ configurations instantly.">
+  <meta property="og:image" content="https://raidcalculator.app/assets/images/og-image.png">
+  <meta property="og:site_name" content="RAID Calculator">
 
-  :focus-visible{
-    outline:2px solid var(--accent-cyan);
-    outline-offset:2px;
-  }
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://raidcalculator.app/">
+  <meta name="twitter:title" content="RAID & ZFS Storage Capacity Calculator">
+  <meta name="twitter:description" content="Calculate usable storage space, fault tolerance, and parity overhead across standard RAID and ZFS RAIDZ configurations instantly.">
+  <meta name="twitter:image" content="https://raidcalculator.app/assets/images/og-image.png">
 
-  /* ---------- Ambient background canvas ---------- */
-  #bg-canvas{
-    position:fixed;
-    inset:0;
-    width:100%;
-    height:100%;
-    z-index:0;
-    opacity:0.95;
-    pointer-events:none;
-  }
+  <!-- Fonts & Preconnect -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  .bg-gradient{
-    position:fixed;
-    inset:0;
-    z-index:0;
-    background:
-      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(59,130,246,0.28), transparent 62%),
-      radial-gradient(ellipse 800px 500px at 110% 10%, rgba(167,139,250,0.26), transparent 62%),
-      radial-gradient(ellipse 700px 600px at 50% 120%, rgba(34,211,238,0.20), transparent 62%);
-    pointer-events:none;
+  <!-- Structured Data: WebApplication Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "RAID & ZFS Capacity Calculator",
+    "operatingSystem": "Any",
+    "applicationCategory": "UtilitiesApplication",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "description": "Interactive online calculator for evaluating array capacity, overhead loss, decimal-to-binary storage ratios, and fault tolerance across RAID 0, 1, 5, 6, 10, 50, 60, and ZFS pool topologies.",
+    "url": "https://raidcalculator.app/"
   }
+  </script>
 
-  /* ---------- Layout shell ---------- */
-  .wrap{
-    position:relative;
-    z-index:1;
-    max-width:1280px;
-    margin:0 auto;
-    padding:0 24px 80px;
+  <!-- Structured Data: FAQ Schema (Generates Google SERP Rich Snippets) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How is usable storage capacity calculated in RAID 5 and RAID 6?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "RAID 5 allocates the capacity equivalent of exactly one disk for distributed parity, resulting in usable capacity calculated as (N - 1) × disk size. RAID 6 utilizes dual parity, reserving the capacity of two disks, resulting in (N - 2) × disk size."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Why is formatted drive capacity lower than advertised storage?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Hard drive manufacturers measure capacity using decimal notation (1 TB = 1,000,000,000,000 bytes). Operating systems compute capacity using binary notation (1 TiB = 1,099,511,627,776 bytes). This creates an inherent 9.09% reduction in reported capacity."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is the difference between ZFS RAIDZ1, RAIDZ2, and RAIDZ3?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "ZFS RAIDZ configurations assign dynamic parity across vdevs. RAIDZ1 tolerates 1 disk failure per vdev, RAIDZ2 tolerates 2 disk failures, and RAIDZ3 tolerates up to 3 disk failures per vdev."
+        }
+      }
+    ]
   }
+  </script>
 
-  header.hero{
-    position:relative;
-    z-index:1;
-    padding:72px 24px 56px;
-    text-align:center;
-    border-bottom:1px solid var(--border-subtle);
-    margin-bottom:48px;
-  }
+  <style>
+    :root{
+      --bg-void:#05070a;
+      --bg-panel:#0d1117;
+      --bg-panel-raised:#131a24;
+      --bg-inset:#0a0f16;
+      --border-subtle:#1c2531;
+      --border-strong:#2a3644;
+      --text-primary:#e6edf3;
+      --text-secondary:#a9b4c0;
+      --text-muted:#6b7684;
+      --accent-cyan:#22d3ee;
+      --accent-cyan-dim:#0e7490;
+      --accent-blue:#3b82f6;
+      --accent-purple:#a78bfa;
+      --accent-green:#34d399;
+      --accent-red:#fb7185;
+      --accent-amber:#f59e0b;
+      --accent-orange:#fb923c;
+      --accent-orange-dark:#c2560f;
+      --font-display:'Space Grotesk', 'Inter', sans-serif;
+      --font-body:'Inter', sans-serif;
+      --font-mono:'JetBrains Mono', monospace;
+      --radius-lg:16px;
+      --radius-md:10px;
+      --radius-sm:6px;
+    }
 
-  .eyebrow{
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    font-family:var(--font-mono);
-    font-size:12px;
-    letter-spacing:0.14em;
-    text-transform:uppercase;
-    color:var(--accent-cyan);
-    background:rgba(34,211,238,0.08);
-    border:1px solid rgba(34,211,238,0.25);
-    padding:6px 14px;
-    border-radius:999px;
-    margin-bottom:22px;
-  }
-  .eyebrow .dot{
-    width:6px; height:6px; border-radius:50%;
-    background:var(--accent-green);
-    box-shadow:0 0 8px var(--accent-green);
-    animation:blink 2.2s ease-in-out infinite;
-  }
-  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+    *{ box-sizing:border-box; }
+    html{ scroll-behavior:smooth; }
+    body{
+      margin:0;
+      background:var(--bg-void);
+      color:var(--text-primary);
+      font-family:var(--font-body);
+      line-height:1.5;
+      -webkit-font-smoothing:antialiased;
+    }
 
-  h1.title{
-    font-family:var(--font-display);
-    font-weight:700;
-    font-size:clamp(2.1rem, 5vw, 3.6rem);
-    margin:0 0 16px;
-    letter-spacing:-0.01em;
-    background:linear-gradient(120deg, #f2f6fa 0%, var(--accent-cyan) 55%, var(--accent-purple) 100%);
-    -webkit-background-clip:text;
-    background-clip:text;
-    color:transparent;
-  }
+    a{ color:var(--accent-cyan); }
 
-  .subtitle{
-    max-width:640px;
-    margin:0 auto;
-    color:var(--text-secondary);
-    font-size:1.05rem;
-  }
+    ::selection{ background:var(--accent-cyan); color:#04121a; }
 
-  /* ---------- Main layout ---------- */
-  main.layout{
-    display:grid;
-    grid-template-columns:minmax(0,440px) minmax(0,1fr);
-    gap:28px;
-    align-items:start;
-  }
+    :focus-visible{
+      outline:2px solid var(--accent-cyan);
+      outline-offset:2px;
+    }
 
-  @media (max-width: 940px){
-    main.layout{ grid-template-columns:1fr; }
-  }
+    /* ---------- Ambient background canvas ---------- */
+    #bg-canvas{
+      position:fixed;
+      inset:0;
+      width:100%;
+      height:100%;
+      z-index:0;
+      opacity:0.95;
+      pointer-events:none;
+    }
 
-  .panel{
-    background:var(--bg-panel);
-    border:1px solid var(--border-subtle);
-    border-radius:var(--radius-lg);
-    padding:26px;
-  }
+    .bg-gradient{
+      position:fixed;
+      inset:0;
+      z-index:0;
+      background:
+        radial-gradient(ellipse 900px 500px at 15% -10%, rgba(59,130,246,0.28), transparent 62%),
+        radial-gradient(ellipse 800px 500px at 110% 10%, rgba(167,139,250,0.26), transparent 62%),
+        radial-gradient(ellipse 700px 600px at 50% 120%, rgba(34,211,238,0.20), transparent 62%);
+      pointer-events:none;
+    }
 
-  .panel + .panel{ margin-top:24px; }
+    /* ---------- Layout shell ---------- */
+    .wrap{
+      position:relative;
+      z-index:1;
+      max-width:1280px;
+      margin:0 auto;
+      padding:0 24px 80px;
+    }
 
-  .panel-title{
-    font-family:var(--font-display);
-    font-size:1.05rem;
-    font-weight:600;
-    margin:0 0 4px;
-    display:flex;
-    align-items:center;
-    gap:10px;
-  }
-  .panel-title .idx{
-    font-family:var(--font-mono);
-    font-size:12px;
-    color:var(--accent-cyan);
-    border:1px solid var(--border-strong);
-    background:var(--bg-inset);
-    padding:2px 7px;
-    border-radius:5px;
-  }
-  .panel-sub{
-    color:var(--text-muted);
-    font-size:13px;
-    margin:0 0 20px;
-  }
+    header.hero{
+      position:relative;
+      z-index:1;
+      padding:72px 24px 56px;
+      text-align:center;
+      border-bottom:1px solid var(--border-subtle);
+      margin-bottom:48px;
+    }
 
-  .panel-header-row{
-    display:flex;
-    align-items:flex-start;
-    justify-content:space-between;
-    gap:14px;
-  }
-  .reset-btn{
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    flex-shrink:0;
-    background:var(--bg-inset);
-    border:1px solid rgba(34,211,238,0.45);
-    color:var(--text-secondary);
-    font-family:var(--font-body);
-    font-weight:600;
-    font-size:12.5px;
-    padding:8px 13px;
-    border-radius:999px;
-    cursor:pointer;
-    transition:border-color .2s ease, color .2s ease, background .2s ease, box-shadow .2s ease;
-    white-space:nowrap;
-    animation:resetIdleGlow 2.6s ease-in-out infinite;
-  }
-  @keyframes resetIdleGlow{
-    0%,100%{ box-shadow:0 0 8px rgba(34,211,238,0.18); }
-    50%{ box-shadow:0 0 16px rgba(34,211,238,0.4); }
-  }
-  .reset-btn svg{ width:14px; height:14px; transition:transform .3s ease; }
-  .reset-btn:hover, .reset-btn:focus-visible{
-    animation-play-state:paused;
-    border-color:var(--accent-red);
-    color:var(--accent-red);
-    background:rgba(251,113,133,0.08);
-    box-shadow:0 0 0 4px rgba(251,113,133,0.14), 0 0 18px rgba(251,113,133,0.45);
-  }
-  .reset-btn:hover svg{ transform:rotate(-70deg); }
-  .reset-btn:active svg{ transform:rotate(-360deg); }
+    .eyebrow{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      font-family:var(--font-mono);
+      font-size:12px;
+      letter-spacing:0.14em;
+      text-transform:uppercase;
+      color:var(--accent-cyan);
+      background:rgba(34,211,238,0.08);
+      border:1px solid rgba(34,211,238,0.25);
+      padding:6px 14px;
+      border-radius:999px;
+      margin-bottom:22px;
+    }
+    .eyebrow .dot{
+      width:6px; height:6px; border-radius:50%;
+      background:var(--accent-green);
+      box-shadow:0 0 8px var(--accent-green);
+      animation:blink 2.2s ease-in-out infinite;
+    }
+    @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.25;} }
 
-  @media (prefers-reduced-motion: reduce){
-    .reset-btn{ animation:none; box-shadow:0 0 10px rgba(34,211,238,0.25); }
-  }
+    h1.title{
+      font-family:var(--font-display);
+      font-weight:700;
+      font-size:clamp(2.1rem, 5vw, 3.6rem);
+      margin:0 0 16px;
+      letter-spacing:-0.01em;
+      background:linear-gradient(120deg, #f2f6fa 0%, var(--accent-cyan) 55%, var(--accent-purple) 100%);
+      -webkit-background-clip:text;
+      background-clip:text;
+      color:transparent;
+    }
 
-  hr.divider{
-    border:none;
-    border-top:1px solid var(--border-subtle);
-    margin:22px 0;
-  }
+    .subtitle{
+      max-width:640px;
+      margin:0 auto;
+      color:var(--text-secondary);
+      font-size:1.05rem;
+    }
 
-  /* ---------- Form controls ---------- */
-  .field{ margin-bottom:18px; }
-  .field label.field-label{
-    display:block;
-    font-size:12.5px;
-    font-weight:600;
-    letter-spacing:0.03em;
-    text-transform:uppercase;
-    color:var(--text-muted);
-    margin-bottom:8px;
-  }
+    /* ---------- Main layout ---------- */
+    main.layout{
+      display:grid;
+      grid-template-columns:minmax(0,440px) minmax(0,1fr);
+      gap:28px;
+      align-items:start;
+    }
 
-  .row{ display:flex; gap:10px; align-items:flex-start; }
-  .row > *{ flex:1; min-width:0; }
-  .row .field-label{
-    min-height:32px;
-    display:flex;
-    align-items:flex-end;
-    line-height:1.3;
-  }
+    @media (max-width: 940px){
+      main.layout{ grid-template-columns:1fr; }
+    }
 
-  input[type="number"], select{
-    width:100%;
-    background:var(--bg-inset);
-    border:1px solid var(--border-strong);
-    color:var(--text-primary);
-    font-family:var(--font-mono);
-    font-size:15px;
-    padding:11px 12px;
-    border-radius:var(--radius-sm);
-    transition:border-color .15s ease, box-shadow .15s ease;
-    appearance:none;
-    -webkit-appearance:none;
-  }
-  select{
-    font-family:var(--font-body);
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7684' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-    background-repeat:no-repeat;
-    background-position:right 10px center;
-    background-size:16px;
-    padding-right:34px;
-  }
-  input[type="number"]:focus, select:focus{
-    border-color:var(--accent-cyan);
-    box-shadow:0 0 0 3px rgba(34,211,238,0.14);
-    outline:none;
-  }
-  input[type="number"]::-webkit-outer-spin-button,
-  input[type="number"]::-webkit-inner-spin-button{
-    opacity:1;
-  }
+    .panel{
+      background:var(--bg-panel);
+      border:1px solid var(--border-subtle);
+      border-radius:var(--radius-lg);
+      padding:26px;
+    }
 
-  .field-hint{
-    font-size:12px;
-    color:var(--text-muted);
-    margin-top:7px;
-  }
-  .field-hint.warn{ color:var(--accent-red); }
+    .panel + .panel{ margin-top:24px; }
 
-  #raidLevel{
-    font-family:var(--font-body);
-    font-weight:600;
-    font-size:15px;
-    padding:13px 34px 13px 14px;
-  }
-  #raidLevel optgroup{
-    font-family:var(--font-mono);
-    font-size:11px;
-    letter-spacing:0.05em;
-    text-transform:uppercase;
-    color:var(--text-muted);
-    font-style:normal;
-    background:var(--bg-panel);
-  }
-  #raidLevel option{
-    font-family:var(--font-body);
-    font-weight:500;
-    color:var(--text-primary);
-    background:var(--bg-inset);
-    padding:8px;
-  }
+    .panel-title{
+      font-family:var(--font-display);
+      font-size:1.05rem;
+      font-weight:600;
+      margin:0 0 4px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .panel-title .idx{
+      font-family:var(--font-mono);
+      font-size:12px;
+      color:var(--accent-cyan);
+      border:1px solid var(--border-strong);
+      background:var(--bg-inset);
+      padding:2px 7px;
+      border-radius:5px;
+    }
+    .panel-sub{
+      color:var(--text-muted);
+      font-size:13px;
+      margin:0 0 20px;
+    }
 
-  .level-desc{
-    margin-top:16px;
-    padding:14px 16px;
-    background:var(--bg-inset);
-    border:1px solid var(--border-subtle);
-    border-radius:var(--radius-md);
-    font-size:13px;
-    color:var(--text-secondary);
-  }
-  .level-desc strong{ color:var(--text-primary); }
+    .panel-header-row{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:14px;
+    }
+    .reset-btn{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      flex-shrink:0;
+      background:var(--bg-inset);
+      border:1px solid rgba(34,211,238,0.45);
+      color:var(--text-secondary);
+      font-family:var(--font-body);
+      font-weight:600;
+      font-size:12.5px;
+      padding:8px 13px;
+      border-radius:999px;
+      cursor:pointer;
+      transition:border-color .2s ease, color .2s ease, background .2s ease, box-shadow .2s ease;
+      white-space:nowrap;
+      animation:resetIdleGlow 2.6s ease-in-out infinite;
+    }
+    @keyframes resetIdleGlow{
+      0%,100%{ box-shadow:0 0 8px rgba(34,211,238,0.18); }
+      50%{ box-shadow:0 0 16px rgba(34,211,238,0.4); }
+    }
+    .reset-btn svg{ width:14px; height:14px; transition:transform .3s ease; }
+    .reset-btn:hover, .reset-btn:focus-visible{
+      animation-play-state:paused;
+      border-color:var(--accent-red);
+      color:var(--accent-red);
+      background:rgba(251,113,133,0.08);
+      box-shadow:0 0 0 4px rgba(251,113,133,0.14), 0 0 18px rgba(251,113,133,0.45);
+    }
+    .reset-btn:hover svg{ transform:rotate(-70deg); }
+    .reset-btn:active svg{ transform:rotate(-360deg); }
 
-  /* ---------- Results panel ---------- */
-  .results-panel{ position:sticky; top:20px; }
+    @media (prefers-reduced-motion: reduce){
+      .reset-btn{ animation:none; box-shadow:0 0 10px rgba(34,211,238,0.25); }
+    }
 
-  .headline-result{
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-    padding:22px 4px 26px;
-    border-bottom:1px solid var(--border-subtle);
-    margin-bottom:20px;
-  }
-  .headline-result .label{
-    font-size:12.5px;
-    text-transform:uppercase;
-    letter-spacing:0.06em;
-    color:var(--text-muted);
-    font-weight:600;
-  }
-  .headline-result .value{
-    font-family:var(--font-mono);
-    font-weight:700;
-    font-size:clamp(2rem, 4vw, 2.9rem);
-    color:var(--accent-green);
-    line-height:1.1;
-  }
-  .headline-result .value small{
-    font-size:0.4em;
-    color:var(--text-muted);
-    font-weight:500;
-    margin-left:6px;
-  }
+    hr.divider{
+      border:none;
+      border-top:1px solid var(--border-subtle);
+      margin:22px 0;
+    }
 
-  .stat-grid{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:12px;
-    margin-bottom:20px;
-  }
-  .stat-card{
-    background:var(--bg-inset);
-    border:1px solid var(--border-subtle);
-    border-radius:var(--radius-md);
-    padding:14px 15px;
-  }
-  .stat-card .stat-label{
-    font-size:11.5px;
-    text-transform:uppercase;
-    letter-spacing:0.05em;
-    color:var(--text-muted);
-    margin-bottom:6px;
-    font-weight:600;
-  }
-  .stat-card .stat-value{
-    font-family:var(--font-mono);
-    font-size:1.15rem;
-    font-weight:600;
-    color:var(--text-primary);
-  }
-  .stat-card.accent-cyan .stat-value{ color:var(--accent-cyan); }
-  .stat-card.accent-purple .stat-value{ color:var(--accent-purple); }
-  .stat-card.accent-red .stat-value{ color:var(--accent-red); }
+    /* ---------- Form controls ---------- */
+    .field{ margin-bottom:18px; }
+    .field label.field-label{
+      display:block;
+      font-size:12.5px;
+      font-weight:600;
+      letter-spacing:0.03em;
+      text-transform:uppercase;
+      color:var(--text-muted);
+      margin-bottom:8px;
+    }
 
-  .efficiency-bar-track{
-    height:10px;
-    border-radius:999px;
-    background:var(--bg-inset);
-    border:1px solid var(--border-subtle);
-    overflow:hidden;
-    margin:8px 0 4px;
-  }
-  .efficiency-bar-fill{
-    height:100%;
-    border-radius:999px;
-    background:linear-gradient(90deg, var(--accent-purple), var(--accent-cyan), var(--accent-green));
-    transition:width .4s ease;
-  }
+    .row{ display:flex; gap:10px; align-items:flex-start; }
+    .row > *{ flex:1; min-width:0; }
+    .row .field-label{
+      min-height:32px;
+      display:flex;
+      align-items:flex-end;
+      line-height:1.3;
+    }
 
-  .fault-badge{
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    font-size:13px;
-    color:var(--text-secondary);
-    background:var(--bg-inset);
-    border:1px solid var(--border-subtle);
-    border-radius:var(--radius-md);
-    padding:12px 14px;
-    margin-bottom:20px;
-  }
-  .fault-badge svg{ flex-shrink:0; width:18px; height:18px; }
-  .fault-badge.level-none{ border-color:rgba(251,113,133,0.4); color:var(--accent-red); }
-  .fault-badge.level-medium{ border-color:rgba(250,204,21,0.4); color:#facc15; }
-  .fault-badge.level-high{ border-color:rgba(52,211,153,0.4); color:var(--accent-green); }
+    input[type="number"], select{
+      width:100%;
+      background:var(--bg-inset);
+      border:1px solid var(--border-strong);
+      color:var(--text-primary);
+      font-family:var(--font-mono);
+      font-size:15px;
+      padding:11px 12px;
+      border-radius:var(--radius-sm);
+      transition:border-color .15s ease, box-shadow .15s ease;
+      appearance:none;
+      -webkit-appearance:none;
+    }
+    select{
+      font-family:var(--font-body);
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7684' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;
+      background-position:right 10px center;
+      background-size:16px;
+      padding-right:34px;
+    }
+    input[type="number"]:focus, select:focus{
+      border-color:var(--accent-cyan);
+      box-shadow:0 0 0 3px rgba(34,211,238,0.14);
+      outline:none;
+    }
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button{
+      opacity:1;
+    }
 
-  .error-banner{
-    display:none;
-    background:rgba(251,113,133,0.08);
-    border:1px solid rgba(251,113,133,0.35);
-    color:var(--accent-red);
-    border-radius:var(--radius-md);
-    padding:14px 16px;
-    font-size:13.5px;
-    margin-bottom:20px;
-  }
-  .error-banner.show{ display:block; }
+    .field-hint{
+      font-size:12px;
+      color:var(--text-muted);
+      margin-top:7px;
+    }
+    .field-hint.warn{ color:var(--accent-red); }
 
-  /* ---------- Array visualizer ---------- */
-  .viz-header{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    margin-bottom:14px;
-    flex-wrap:wrap;
-    gap:10px;
-  }
-  .legend{ display:flex; gap:14px; flex-wrap:wrap; }
-  .legend-item{
-    display:flex;
-    align-items:center;
-    gap:6px;
-    font-size:12px;
-    color:var(--text-muted);
-    font-family:var(--font-mono);
-  }
-  .legend-swatch{ width:11px; height:11px; border-radius:3px; }
+    #raidLevel{
+      font-family:var(--font-body);
+      font-weight:600;
+      font-size:15px;
+      padding:13px 34px 13px 14px;
+    }
+    #raidLevel optgroup{
+      font-family:var(--font-mono);
+      font-size:11px;
+      letter-spacing:0.05em;
+      text-transform:uppercase;
+      color:var(--text-muted);
+      font-style:normal;
+      background:var(--bg-panel);
+    }
+    #raidLevel option{
+      font-family:var(--font-body);
+      font-weight:500;
+      color:var(--text-primary);
+      background:var(--bg-inset);
+      padding:8px;
+    }
 
-  .vdev-group{
-    border:1px solid var(--border-subtle);
-    border-radius:var(--radius-md);
-    padding:14px;
-    margin-bottom:12px;
-    background:var(--bg-inset);
-  }
-  .vdev-group .vdev-label{
-    font-family:var(--font-mono);
-    font-size:11px;
-    color:var(--text-muted);
-    margin-bottom:10px;
-    text-transform:uppercase;
-    letter-spacing:0.05em;
-  }
-  .disk-row{
-    display:flex;
-    gap:6px;
-    flex-wrap:wrap;
-    margin-bottom:6px;
-  }
-  .disk-cell{
-    width:26px;
-    height:26px;
-    border-radius:6px;
-    background:var(--border-strong);
-    position:relative;
-    transition:background .3s ease;
-    flex-shrink:0;
-  }
-  .disk-cell.data{ background:var(--accent-cyan); }
-  .disk-cell.parity{
-    background:repeating-linear-gradient(45deg, var(--accent-orange), var(--accent-orange) 4px, var(--accent-orange-dark) 4px, var(--accent-orange-dark) 8px);
-  }
-  .disk-cell.mirror{
-    background:repeating-linear-gradient(45deg, var(--accent-orange), var(--accent-orange) 4px, var(--accent-orange-dark) 4px, var(--accent-orange-dark) 8px);
-    animation:pulseSync 2.4s ease-in-out infinite;
-  }
-  .disk-cell.spare{ background:var(--border-strong); }
-  .disk-cell.spare-hot{
-    background:transparent;
-    border:2px dashed var(--text-secondary);
-  }
-  .vdev-group.spare-group{
-    border-style:dashed;
-    border-color:rgba(245,158,11,0.4);
-    background:rgba(245,158,11,0.04);
-  }
+    .level-desc{
+      margin-top:16px;
+      padding:14px 16px;
+      background:var(--bg-inset);
+      border:1px solid var(--border-subtle);
+      border-radius:var(--radius-md);
+      font-size:13px;
+      color:var(--text-secondary);
+    }
+    .level-desc strong{ color:var(--text-primary); }
 
-  @keyframes pulseSync{
-    0%,100%{ opacity:1; }
-    50%{ opacity:0.45; }
-  }
+    /* ---------- Results panel ---------- */
+    .results-panel{ position:sticky; top:20px; }
 
-  .more-note{
-    font-family:var(--font-mono);
-    font-size:11.5px;
-    color:var(--text-muted);
-    margin-top:4px;
-  }
+    .headline-result{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      padding:22px 4px 26px;
+      border-bottom:1px solid var(--border-subtle);
+      margin-bottom:20px;
+    }
+    .headline-result .label{
+      font-size:12.5px;
+      text-transform:uppercase;
+      letter-spacing:0.06em;
+      color:var(--text-muted);
+      font-weight:600;
+    }
+    .headline-result .value{
+      font-family:var(--font-mono);
+      font-weight:700;
+      font-size:clamp(2rem, 4vw, 2.9rem);
+      color:var(--accent-green);
+      line-height:1.1;
+    }
+    .headline-result .value small{
+      font-size:0.4em;
+      color:var(--text-muted);
+      font-weight:500;
+      margin-left:6px;
+    }
 
-  .viz-caption{
-    font-size:12px;
-    color:var(--text-muted);
-    margin-top:10px;
-    line-height:1.6;
-  }
+    .stat-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+      margin-bottom:20px;
+    }
+    .stat-card{
+      background:var(--bg-inset);
+      border:1px solid var(--border-subtle);
+      border-radius:var(--radius-md);
+      padding:14px 15px;
+    }
+    .stat-card .stat-label{
+      font-size:11.5px;
+      text-transform:uppercase;
+      letter-spacing:0.05em;
+      color:var(--text-muted);
+      margin-bottom:6px;
+      font-weight:600;
+    }
+    .stat-card .stat-value{
+      font-family:var(--font-mono);
+      font-size:1.15rem;
+      font-weight:600;
+      color:var(--text-primary);
+    }
+    .stat-card.accent-cyan .stat-value{ color:var(--accent-cyan); }
+    .stat-card.accent-purple .stat-value{ color:var(--accent-purple); }
+    .stat-card.accent-red .stat-value{ color:var(--accent-red); }
 
-  @media (prefers-reduced-motion: reduce){
-    .disk-cell.mirror{ animation:none; }
-    .eyebrow .dot{ animation:none; }
-    html{ scroll-behavior:auto; }
-  }
+    .efficiency-bar-track{
+      height:10px;
+      border-radius:999px;
+      background:var(--bg-inset);
+      border:1px solid var(--border-subtle);
+      overflow:hidden;
+      margin:8px 0 4px;
+    }
+    .efficiency-bar-fill{
+      height:100%;
+      border-radius:999px;
+      background:linear-gradient(90deg, var(--accent-purple), var(--accent-cyan), var(--accent-green));
+      transition:width .4s ease;
+    }
 
-  /* ---------- Footer ---------- */
-  footer{
-    max-width:1280px;
-    margin:56px auto 0;
-    padding:24px 24px 0;
-    border-top:1px solid var(--border-subtle);
-    color:var(--text-muted);
-    font-size:12.5px;
-    text-align:center;
-    position:relative;
-    z-index:1;
-  }
-  footer p{ margin:6px 0; }
-</style>
+    .fault-badge{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      font-size:13px;
+      color:var(--text-secondary);
+      background:var(--bg-inset);
+      border:1px solid var(--border-subtle);
+      border-radius:var(--radius-md);
+      padding:12px 14px;
+      margin-bottom:20px;
+    }
+    .fault-badge svg{ flex-shrink:0; width:18px; height:18px; }
+    .fault-badge.level-none{ border-color:rgba(251,113,133,0.4); color:var(--accent-red); }
+    .fault-badge.level-medium{ border-color:rgba(250,204,21,0.4); color:#facc15; }
+    .fault-badge.level-high{ border-color:rgba(52,211,153,0.4); color:var(--accent-green); }
+
+    .error-banner{
+      display:none;
+      background:rgba(251,113,133,0.08);
+      border:1px solid rgba(251,113,133,0.35);
+      color:var(--accent-red);
+      border-radius:var(--radius-md);
+      padding:14px 16px;
+      font-size:13.5px;
+      margin-bottom:20px;
+    }
+    .error-banner.show{ display:block; }
+
+    /* ---------- Array visualizer ---------- */
+    .viz-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:14px;
+      flex-wrap:wrap;
+      gap:10px;
+    }
+    .legend{ display:flex; gap:14px; flex-wrap:wrap; }
+    .legend-item{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      font-size:12px;
+      color:var(--text-muted);
+      font-family:var(--font-mono);
+    }
+    .legend-swatch{ width:11px; height:11px; border-radius:3px; }
+
+    .vdev-group{
+      border:1px solid var(--border-subtle);
+      border-radius:var(--radius-md);
+      padding:14px;
+      margin-bottom:12px;
+      background:var(--bg-inset);
+    }
+    .vdev-group .vdev-label{
+      font-family:var(--font-mono);
+      font-size:11px;
+      color:var(--text-muted);
+      margin-bottom:10px;
+      text-transform:uppercase;
+      letter-spacing:0.05em;
+    }
+    .disk-row{
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+      margin-bottom:6px;
+    }
+    .disk-cell{
+      width:26px;
+      height:26px;
+      border-radius:6px;
+      background:var(--border-strong);
+      position:relative;
+      transition:background .3s ease;
+      flex-shrink:0;
+    }
+    .disk-cell.data{ background:var(--accent-cyan); }
+    .disk-cell.parity{
+      background:repeating-linear-gradient(45deg, var(--accent-orange), var(--accent-orange) 4px, var(--accent-orange-dark) 4px, var(--accent-orange-dark) 8px);
+    }
+    .disk-cell.mirror{
+      background:repeating-linear-gradient(45deg, var(--accent-orange), var(--accent-orange) 4px, var(--accent-orange-dark) 4px, var(--accent-orange-dark) 8px);
+      animation:pulseSync 2.4s ease-in-out infinite;
+    }
+    .disk-cell.spare{ background:var(--border-strong); }
+    .disk-cell.spare-hot{
+      background:transparent;
+      border:2px dashed var(--text-secondary);
+    }
+    .vdev-group.spare-group{
+      border-style:dashed;
+      border-color:rgba(245,158,11,0.4);
+      background:rgba(245,158,11,0.04);
+    }
+
+    @keyframes pulseSync{
+      0%,100%{ opacity:1; }
+      50%{ opacity:0.45; }
+    }
+
+    .more-note{
+      font-family:var(--font-mono);
+      font-size:11.5px;
+      color:var(--text-muted);
+      margin-top:4px;
+    }
+
+    .viz-caption{
+      font-size:12px;
+      color:var(--text-muted);
+      margin-top:10px;
+      line-height:1.6;
+    }
+
+    @media (prefers-reduced-motion: reduce){
+      .disk-cell.mirror{ animation:none; }
+      .eyebrow .dot{ animation:none; }
+      html{ scroll-behavior:auto; }
+    }
+
+    /* ---------- Footer ---------- */
+    footer{
+      max-width:1280px;
+      margin:56px auto 0;
+      padding:24px 24px 0;
+      border-top:1px solid var(--border-subtle);
+      color:var(--text-muted);
+      font-size:12.5px;
+      text-align:center;
+      position:relative;
+      z-index:1;
+    }
+    footer p{ margin:6px 0; }
+  </style>
 </head>
+
 <body>
 
 <canvas id="bg-canvas" aria-hidden="true"></canvas>
@@ -705,6 +783,53 @@
   </div>
 
 </main>
+
+<!-- ============ SEO TECHNICAL CONTENT SECTION ============ -->
+<section class="seo-content" style="margin-top: 64px; border-top: 1px solid var(--border-subtle); padding-top: 48px;">
+  <article class="panel" style="max-width: 100%; margin-bottom: 32px;">
+    <h2 style="font-family: var(--font-display); font-size: 1.6rem; color: var(--accent-cyan); margin-top: 0;">
+      Understanding RAID &amp; ZFS Array Capacity
+    </h2>
+    <p style="color: var(--text-secondary); line-height: 1.6;">
+      Designing storage arrays requires accurate capacity calculations that factor in parity distribution, redundancy overhead, spare allocations, and base-10 to base-2 binary conversion losses. This calculator evaluates standard hardware and software RAID levels along with OpenZFS pool layouts to provide operational metrics before deployment.
+    </p>
+
+    <h3 style="font-family: var(--font-display); font-size: 1.25rem; color: var(--text-primary); margin-top: 28px;">
+      Standard RAID Level Overview
+    </h3>
+    <ul style="color: var(--text-secondary); padding-left: 20px; line-height: 1.7;">
+      <li><strong>RAID 0 (Striping):</strong> Combines all drives into a single logical volume with 100% capacity efficiency. Offers no fault tolerance; a single drive failure causes complete data loss.</li>
+      <li><strong>RAID 1 (Mirroring):</strong> Duplicates identical data across paired drives. Provides 50% usable capacity with single-drive fault tolerance per mirror set.</li>
+      <li><strong>RAID 5 (Block-Level Parity):</strong> Distributes single-parity blocks across a minimum of 3 drives. Usable storage equals (N - 1) × drive size, sustaining 1 drive failure.</li>
+      <li><strong>RAID 6 (Dual Parity):</strong> Uses dual distributed parity across a minimum of 4 drives. Usable storage equals (N - 2) × drive size, surviving up to 2 simultaneous drive failures.</li>
+      <li><strong>RAID 10 (Striped Mirrors):</strong> Combines RAID 1 mirroring with RAID 0 striping across 4 or more drives. Provides high throughput and 50% storage capacity.</li>
+      <li><strong>RAID 50 &amp; RAID 60 (Nested Parity):</strong> Combines block-level parity vdevs into striped sets, optimizing rebuild speed and fault tolerance for enterprise high-density arrays.</li>
+    </ul>
+
+    <h3 style="font-family: var(--font-display); font-size: 1.25rem; color: var(--text-primary); margin-top: 28px;">
+      OpenZFS Pool Architecture (RAIDZ)
+    </h3>
+    <p style="color: var(--text-secondary); line-height: 1.6;">
+      OpenZFS bypasses traditional hardware controllers, implementing soft allocation via Virtual Devices (vdevs).
+    </p>
+    <ul style="color: var(--text-secondary); padding-left: 20px; line-height: 1.7;">
+      <li><strong>RAIDZ1:</strong> Single parity overhead per vdev (similar to RAID 5, requires 3+ drives).</li>
+      <li><strong>RAIDZ2:</strong> Double parity overhead per vdev (similar to RAID 6, requires 4+ drives).</li>
+      <li><strong>RAIDZ3:</strong> Triple parity overhead per vdev (tolerates 3 disk failures per vdev, requires 5+ drives).</li>
+    </ul>
+
+    <h3 style="font-family: var(--font-display); font-size: 1.25rem; color: var(--text-primary); margin-top: 28px;">
+      Decimal (TB) vs. Binary (TiB) Overhead Conversion
+    </h3>
+    <p style="color: var(--text-secondary); line-height: 1.6;">
+      Storage vendors market drives using base-10 metrics (1 TB = 10<sup>12</sup> bytes), whereas host operating systems calculate storage in base-2 binary tebibytes (1 TiB = 2<sup>40</sup> bytes = 1,099,511,627,776 bytes). Converting raw vendor capacity to usable binary space uses the equation:
+    </p>
+    <div style="background: var(--bg-inset); border: 1px solid var(--border-subtle); padding: 14px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.95rem; color: var(--accent-cyan); margin: 16px 0;">
+      Capacity (TiB) = [ Raw Capacity (TB) × 1,000,000,000,000 ] / 1,099,511,627,776
+    </div>
+  </article>
+</section>
+
 </div>
 
 <footer>

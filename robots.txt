@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /LICENSE
+Disallow: /LICENSE.*
+Disallow: /README.md
+
+Sitemap: https://raidcalculator.app/sitemap.xml
